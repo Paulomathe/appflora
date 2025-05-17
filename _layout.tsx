@@ -1,90 +1,220 @@
-import { router, Stack } from "expo-router";
-import React, { useEffect, useRef } from "react";
-import { View, ActivityIndicator, Text } from "react-native";
+import { Drawer } from 'expo-router/drawer';
+import { FontAwesome } from '@expo/vector-icons';
 import colors from "@/constants/colors";
-import { supabase } from "../lib/supabase";
-import { AuthProvider, useAuth } from "../contexts/AuthContext";
-import { EmpresaProvider, useEmpresa } from "../contexts/EmpresaContext";
-import 'react-native-gesture-handler';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Alert, TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+import { supabase } from '@/lib/supabase';
+import { router } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import { useEffect, useRef } from 'react';
+import { SwitchEmpresa } from '@/components/SwitchEmpresa';
+import { ProfileInfo } from '@/components/ProfileInfo';
 
-// Verificação para detectar problemas com as biblitecas
-const checkLibraryCompatibility = () => {
-  try {
-    // Verificar se conseguimos importar os componentes básicos do RNE
-    const rne = require('@rneui/themed');
-    const Button = rne.Button;
-    const Input = rne.Input;
-    
-    if (!Button || !Input) {
-      console.warn('Componentes básicos do React Native Elements não encontrados');
-    } else {
-      console.log('React Native Elements carregado com sucesso');
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Erro ao carregar bibliotecas:', error);
-    return false;
-  }
+type DrawerIconProps = {
+  color: string;
+  size: number;
 };
 
-export default function RootLayout() {
-  // Verificar compatibilidade logo na inicialização
-  React.useEffect(() => {
-    checkLibraryCompatibility();
-  }, []);
-
-  return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <AuthProvider>
-          <EmpresaProvider>
-            <MainLayout />
-          </EmpresaProvider>
-        </AuthProvider>
-      </GestureHandlerRootView>
-    </SafeAreaProvider>
-  );
-}
-
-function MainLayout() {
-  const { user, loading } = useAuth();
-  const { empresa } = useEmpresa();
-  const initialRedirectDone = useRef(false);
-
+export default function PainelLayout() {
+  const { setAuth, user } = useAuth();
+  const redirectRef = useRef(false);
+  
   useEffect(() => {
-    if (loading || initialRedirectDone.current) return;
-
-    if (user) {
-      initialRedirectDone.current = true;
-      router.replace('/profile/page');
-    } else {
-      initialRedirectDone.current = true;
+    if (!user && !redirectRef.current) {
+      redirectRef.current = true;
       router.replace('/signin/page');
     }
-  }, [user, loading]);
+  }, [user]);
 
-  if (loading) {
+  if (!user) {
+    return null;
+  }
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setAuth(null);
+      router.replace('/signin/page');
+    } catch (error) {
+      Alert.alert('Erro', 'Erro ao fazer logout');
+    }
+  };
+
+  function CustomDrawerContent(props: any) {
+    const userName = user?.user_metadata?.name || 'Usuário';
+    const userEmail = user?.email || '';
+    const profileImage = user?.user_metadata?.avatar_url || null;
+
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <DrawerContentScrollView {...props}>
+        <View style={styles.drawerContent}>
+          <ProfileInfo 
+            name={userName}
+            email={userEmail}
+            avatarUrl={profileImage}
+          />
+          
+          <SwitchEmpresa />
+
+          <View style={styles.drawerSection}>
+            <DrawerItemList {...props} />
+            <View style={styles.logoutSection}>
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={handleLogout}
+              >
+                <FontAwesome name="sign-out" size={24} color={colors.error} style={{ marginRight: 32 }} />
+                <Text style={{ color: colors.error, fontSize: 16 }}>Sair</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </DrawerContentScrollView>
     );
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="signin/page" />
-      <Stack.Screen name="signup/page" />
-      <Stack.Screen name="(painel)" />
-      <Stack.Screen name="(profile)/page" />
-      <Stack.Screen name="selecionar-filial" />
-      <Stack.Screen name="app-test" />
-      <Stack.Screen name="home-test" />
-      <Stack.Screen name="redefinir-senha" />
-    </Stack>
+    <Drawer
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.primary,
+        },
+        headerTintColor: colors.white,
+        drawerActiveBackgroundColor: colors.primary,
+        drawerActiveTintColor: colors.white,
+        drawerInactiveTintColor: colors.text,
+      }}
+    >
+      <Drawer.Screen
+        name="home"
+        options={{
+          title: 'Vendas',
+          drawerIcon: ({ color, size }: DrawerIconProps) => (
+            <FontAwesome name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="produtos"
+        options={{
+          title: 'Produtos',
+          drawerIcon: ({ color, size }: DrawerIconProps) => (
+            <FontAwesome name="cube" size={size} color={color} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="servicos"
+        options={{
+          title: 'Serviços',
+          drawerIcon: ({ color, size }: DrawerIconProps) => (
+            <FontAwesome name="wrench" size={size} color={color} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="clientes"
+        options={{
+          title: 'Clientes',
+          drawerIcon: ({ color, size }: DrawerIconProps) => (
+            <FontAwesome name="users" size={size} color={color} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="vendedores"
+        options={{
+          title: 'Vendedores',
+          drawerIcon: ({ color, size }: DrawerIconProps) => (
+            <FontAwesome name="user-secret" size={size} color={color} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="configuracoes"
+        options={{
+          title: 'Configurações',
+          drawerIcon: ({ color, size }: DrawerIconProps) => (
+            <FontAwesome name="cog" size={size} color={color} />
+          ),
+        }}
+      />
+      <Drawer.Screen
+        name="profile"
+        options={{
+          title: 'Meu Perfil',
+          drawerIcon: ({ color, size }: DrawerIconProps) => (
+            <FontAwesome name="user" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* Telas modais */}
+      <Drawer.Screen
+        name="produtos/cadastrar"
+        options={{
+          title: 'Cadastrar Produto',
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+      <Drawer.Screen
+        name="servicos/cadastrar"
+        options={{
+          title: 'Cadastrar Serviço',
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+      <Drawer.Screen
+        name="vendedores/cadastrar"
+        options={{
+          title: 'Cadastrar Vendedor',
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+      <Drawer.Screen
+        name="clientes/cadastrar"
+        options={{
+          title: 'Cadastrar Cliente',
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+      <Drawer.Screen
+        name="nova-venda"
+        options={{
+          title: 'Nova Venda',
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+      <Drawer.Screen
+        name="vendas/detalhes"
+        options={{
+          title: 'Detalhes da Venda',
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+    </Drawer>
   );
 }
+
+const styles = StyleSheet.create({
+  drawerContent: {
+    flex: 1,
+  },
+  drawerSection: {
+    flex: 1,
+    marginTop: 8,
+  },
+  logoutSection: {
+    borderTopWidth: 1, 
+    borderTopColor: colors.border,
+    marginTop: 'auto',
+    paddingTop: 16,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  }
+}); 
